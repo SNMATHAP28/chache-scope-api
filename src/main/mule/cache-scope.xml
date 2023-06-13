@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="8d59493c-44ca-4745-bb3a-1192362bf229" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="58c70b79-96ed-4467-81dc-45012ea9d03d" keyGenerationExpression="#[payload.id]" />
+	<ee:object-store-caching-strategy name="Caching_Strategy1" doc:name="Caching Strategy" doc:id="0155179d-b91f-4c15-8f99-12d0536dbd0c" keyGenerationExpression="#[payload.id]" >
+		<os:private-object-store alias="caching" maxEntries="2" entryTtl="10" expirationIntervalUnit="SECONDS"/>
+	</ee:object-store-caching-strategy>
+	<flow name="cache-scopeFlow-for-non-reapeatable-stream" doc:id="a794a73c-c275-4e99-8c59-1748c15ab799" maxConcurrency="1">
+		<http:listener doc:name="Listener" doc:id="282081f6-3da0-47ad-a2af-860424bcfc3c" config-ref="HTTP_Listener_config" path="/cache">
+			<non-repeatable-stream />
+		</http:listener>
+		<logger level="INFO" doc:name="Request Received" doc:id="e59b3359-e07a-43dc-abab-6fef026df194" message="Request Received"/>
+		<ee:cache doc:name="Cache" doc:id="e5db891a-56b7-4cda-8f1e-7c92acfa9057" >
+			<logger level="INFO" doc:name="cache scope begin" doc:id="75209c41-9cba-43bb-8267-67608bf3e676" message="cache scope begin"/>
+			<ee:transform doc:name="Transform Message" doc:id="b6a3381e-5428-46f0-bcaa-8fdbe44c9562" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "hello world"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="INFO" doc:name="cache ends" doc:id="752fd3e8-28bb-4128-ba2f-6946b1bfe22f" message="cache ends"/>
+		</ee:cache>
+		<logger level="INFO" doc:name="Response sent successfully" doc:id="c84ebe76-9d48-4844-a409-c4bd17f61b72" message="Response sent successfully"/>
+	</flow>
+	<flow name="cache-scopeFlow1--for-reapeatable-stream" doc:id="b5af9bf3-8d5d-4a98-9025-25aa21b53b03" >
+		<http:listener doc:name="Listener" doc:id="90316572-40b7-4819-87b2-6b7ddea491ee" config-ref="HTTP_Listener_config" path="/cache1" />
+		<logger level="INFO" doc:name="Request Received" doc:id="4767962c-36b5-4d90-b342-82c3f7e2b28d" message="Request Received" />
+		<ee:cache doc:name="Cache" doc:id="752a157c-9212-40df-90e1-e3d3854a74b8" cachingStrategy-ref="Caching_Strategy">
+			<logger level="INFO" doc:name="cache scope begin" doc:id="97167fa3-898a-46c8-bd58-6d33884ce0f2" message="cache scope begin" />
+			<ee:transform doc:name="Transform Message" doc:id="706f0689-26bc-4d28-9603-eaac63dbfe4e" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": if(payload.id == 1)"hello" else "world"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="INFO" doc:name="cache ends" doc:id="b20c51f0-b247-4439-ad1f-130ff5aa7b35" message="cache ends" />
+		</ee:cache>
+		<logger level="INFO" doc:name="Response sent successfully" doc:id="05ae337a-87cc-451d-8280-50ae5a76e619" message="Response sent successfully" />
+	</flow>
+	<flow name="cache-scopeFlow2-using-objectstore-configuration" doc:id="4e6fb0cf-9f1c-44cc-8107-4ab222ce6aa1" >
+		<http:listener doc:name="Listener" doc:id="74c7dd75-6741-4210-844d-e199d7de84d6" config-ref="HTTP_Listener_config" path="/cache2" />
+		<logger level="INFO" doc:name="Request Received" doc:id="9fee75b2-a0af-4db7-823c-60b95b132e86" message="Request Received" />
+		<ee:cache doc:name="Cache" doc:id="042c3730-2fb8-4d11-98b2-821d0c43117d" cachingStrategy-ref="Caching_Strategy1" >
+			<logger level="INFO" doc:name="cache scope begin" doc:id="39ffa49d-167e-4518-8bc5-55e40f99e3bd" message="cache scope begin" />
+			<ee:transform doc:name="Transform Message" doc:id="8c226462-974c-420e-9150-5dba604ddb50" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": if(payload.id == 1)"hello" else "world"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="INFO" doc:name="cache ends" doc:id="8118cfde-0fc4-4ff3-a77a-a0fa9ece919c" message="cache ends" />
+		</ee:cache>
+		<logger level="INFO" doc:name="Response sent successfully" doc:id="9be31d19-719d-4d48-8a81-8e3636a4b0b5" message="Response sent successfully" />
+	</flow>
+</mule>
